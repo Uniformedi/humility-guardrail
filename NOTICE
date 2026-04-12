@@ -1,0 +1,19 @@
+humility-guardrail
+Copyright (c) 2026 Dan Medina / Uniformedi LLC
+
+This product implements the SAIVAS (Sentient AI Value Alignment Standard)
+framework, originally published in:
+
+    Uniform Gnosis, Volume I
+    by Dan Medina
+    https://uniformgnosis.com/Uniform_Gnosis_Volume_I
+
+SAIVAS and the Humility principles (H1–H6) are intellectual property of
+Dan Medina. The reference implementation in this repository is released
+under the MIT License (see LICENSE) to encourage broad adoption.
+
+Downstream users are encouraged but not required to credit the framework
+in user-facing documentation:
+
+    "Alignment provided by the Humility guardrail
+     (SAIVAS framework, Uniform Gnosis Vol. I, Dan Medina)."

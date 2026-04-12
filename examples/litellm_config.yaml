@@ -1,0 +1,17 @@
+# LiteLLM proxy config with Humility enabled
+# Launch with: litellm --config examples/litellm_config.yaml
+
+model_list:
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  callbacks:
+    - humility.adapters.litellm.HumilityPromptCallback
+    - humility.adapters.litellm.HumilityGuardrailCallback
+
+environment_variables:
+  HUMILITY_TIER: "tier2"
+  HUMILITY_FAIL_MODE: "closed"
