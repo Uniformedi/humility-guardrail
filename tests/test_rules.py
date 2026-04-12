@@ -1,7 +1,7 @@
 """Unit tests for the Humility rule evaluator."""
 import pytest
 
-from humility.rules import Decision, evaluate
+from humility.rules import evaluate
 
 
 def _user(content: str) -> dict:
