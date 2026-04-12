@@ -97,4 +97,3 @@ SAIVAS and the Humility framework originate in *Uniform Gnosis, Volume I* by Dan
 
 - Website: https://uniformgnosis.com
 - Hosted playground: https://humility.uniformedi.com (coming soon)
-- Enterprise platform: [InsideLLM](https://github.com/uniformedi/insidellm) — self-hosted AI gateway built around Humility
