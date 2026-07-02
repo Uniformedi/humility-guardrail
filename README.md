@@ -43,13 +43,52 @@ messages = [
 
 ### 2. As a LiteLLM callback (covers OpenAI, Anthropic, Bedrock, Azure, 100+ providers)
 
+**Using the LiteLLM SDK directly** (no proxy server, no `config.yaml`):
+
+```python
+import litellm
+from humility.adapters.litellm import HumilityPromptCallback, HumilityGuardrailCallback
+
+litellm.callbacks = [HumilityPromptCallback(), HumilityGuardrailCallback()]
+# now every litellm.completion()/litellm.acompletion() call is guarded
+```
+
+**Using the LiteLLM Proxy** (`litellm --config config.yaml`): you cannot reference
+`humility.adapters.litellm.HumilityPromptCallback` directly in `callbacks:`.
+LiteLLM's proxy config loader (`get_instance_fn`) always resolves `callbacks:`
+entries as a **file path relative to `config.yaml`'s directory** — it never
+falls back to a real package import when loading from a config file — so this
+fails with `ImportError: Could not find module file
+.../humility/adapters/litellm.py`, even though the package is installed.
+
+Instead, drop a small shim file next to your `config.yaml` that imports and
+**instantiates** the callbacks (the proxy loader also expects an instance, not
+the bare class — handing it the class produces `missing 1 required positional
+argument: 'self'` on the *first real request*, not at startup, since it isn't
+exercised until a hook actually fires):
+
+`humility_callbacks.py` (same directory as `config.yaml`):
+```python
+from humility.adapters.litellm import HumilityGuardrailCallback, HumilityPromptCallback
+
+# Both read HUMILITY_TIER / HUMILITY_FAIL_MODE from the environment by
+# default, so no-arg construction is correct here.
+HumilityPromptCallback = HumilityPromptCallback()
+HumilityGuardrailCallback = HumilityGuardrailCallback()
+```
+
 `config.yaml`:
 ```yaml
 litellm_settings:
   callbacks:
-    - humility.adapters.litellm.HumilityPromptCallback
-    - humility.adapters.litellm.HumilityGuardrailCallback
+    - humility_callbacks.HumilityPromptCallback
+    - humility_callbacks.HumilityGuardrailCallback
 ```
+
+If you run the proxy in a container, make sure `humility_callbacks.py` is
+actually present at that path relative to wherever `config.yaml` is mounted
+(e.g. bind-mount it alongside `config.yaml` rather than relying on it being
+baked into the image only).
 
 ### 3. As a decorator around your OpenAI client
 
