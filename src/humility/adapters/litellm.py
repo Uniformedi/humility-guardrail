@@ -50,7 +50,8 @@ class HumilityPromptCallback(CustomLogger):
         return system_prompt(self.tier)
 
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
-        if call_type not in ("completion", "acompletion"):
+        # Support anthropic_messages call type (native Anthropic Messages API endpoint)
+        if call_type not in ("completion", "acompletion", "anthropic_messages"):
             return data
         messages = data.get("messages") or []
         if not messages:
@@ -62,13 +63,29 @@ class HumilityPromptCallback(CustomLogger):
         if not prompt:
             return data
 
-        if messages[0].get("role") == "system":
-            existing = messages[0].get("content", "")
-            messages[0]["content"] = f"{SENTINEL}\n{prompt}\n\n{existing}"
+        # For anthropic_messages, use top-level system parameter instead of messages[0]
+        if call_type == "anthropic_messages":
+            existing_system = data.get("system", "")
+            if isinstance(existing_system, str):
+                data["system"] = f"{SENTINEL}\n{prompt}\n\n{existing_system}" if existing_system else f"{SENTINEL}\n{prompt}"
+            elif isinstance(existing_system, list):
+                # Handle content blocks format
+                existing_text = "\n\n".join(
+                    block.get("text", "") for block in existing_system
+                    if isinstance(block, dict) and block.get("type") == "text"
+                )
+                data["system"] = f"{SENTINEL}\n{prompt}\n\n{existing_text}" if existing_text else f"{SENTINEL}\n{prompt}"
+            else:
+                data["system"] = f"{SENTINEL}\n{prompt}"
         else:
-            messages.insert(0, {"role": "system", "content": f"{SENTINEL}\n{prompt}"})
+            # For OpenAI-compatible endpoints, use messages[0] with role=system
+            if messages[0].get("role") == "system":
+                existing = messages[0].get("content", "")
+                messages[0]["content"] = f"{SENTINEL}\n{prompt}\n\n{existing}"
+            else:
+                messages.insert(0, {"role": "system", "content": f"{SENTINEL}\n{prompt}"})
+            data["messages"] = messages
 
-        data["messages"] = messages
         return data
 
 
@@ -101,7 +118,8 @@ class HumilityGuardrailCallback(CustomLogger):
         return None
 
     async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
-        if call_type not in ("completion", "acompletion"):
+        # Support anthropic_messages call type (native Anthropic Messages API endpoint)
+        if call_type not in ("completion", "acompletion", "anthropic_messages"):
             return data
         messages = data.get("messages") or []
         if not messages:
@@ -132,15 +150,25 @@ class HumilityGuardrailCallback(CustomLogger):
 
         reframe = reframe_instructions(decision.deny_reasons)
         if reframe:
-            new_messages = list(messages)
-            reframe_msg = {"role": "system", "content": f"[HUMILITY REFRAME]\n{reframe}"}
-            insert_idx = len(new_messages) - 1
-            for i in range(len(new_messages) - 1, -1, -1):
-                if new_messages[i].get("role") == "user":
-                    insert_idx = i
-                    break
-            new_messages.insert(insert_idx, reframe_msg)
-            return {**result_data, "messages": new_messages}
+            # For anthropic_messages, append reframe to top-level system parameter
+            if call_type == "anthropic_messages":
+                existing_system = data.get("system", "")
+                if isinstance(existing_system, str):
+                    result_data["system"] = f"{existing_system}\n\n[HUMILITY REFRAME]\n{reframe}" if existing_system else f"[HUMILITY REFRAME]\n{reframe}"
+                else:
+                    result_data["system"] = f"[HUMILITY REFRAME]\n{reframe}"
+            else:
+                # For OpenAI-compatible endpoints, insert reframe message before last user message
+                new_messages = list(messages)
+                reframe_msg = {"role": "system", "content": f"[HUMILITY REFRAME]\n{reframe}"}
+                insert_idx = len(new_messages) - 1
+                for i in range(len(new_messages) - 1, -1, -1):
+                    if new_messages[i].get("role") == "user":
+                        insert_idx = i
+                        break
+                new_messages.insert(insert_idx, reframe_msg)
+                result_data["messages"] = new_messages
+            return result_data
 
         raise Exception(
             "Request blocked by Humility guardrail: "
