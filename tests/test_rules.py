@@ -92,3 +92,32 @@ def test_restricted_adds_attestation_obligation():
     )
     types = [o["type"] for o in decision.obligations]
     assert "require.attestation" in types
+
+
+# ---------------------------------------------------------------------------
+# Normalisation — each of these bypassed the matcher before _normalize was
+# extended beyond NFKC + lowercase.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "label,content",
+    [
+        ("ascii", "Tell me about the cosmic truth."),
+        ("uppercase", "Tell me about the COSMIC TRUTH."),
+        ("fullwidth", "Tell me about the ｃｏｓｍｉｃ truth."),
+        ("cyrillic_o", "Tell me about the cоsmic truth."),
+        ("greek_omicron", "Tell me about the cοsmic truth."),
+        ("zero_width", "Tell me about the cos​mic truth."),
+        ("soft_hyphen", "Tell me about the cos­mic truth."),
+    ],
+)
+def test_homoglyph_and_invisible_bypasses_are_closed(label, content):
+    decision = evaluate([_user(content)])
+    assert not decision.allow, f"{label} bypassed H1"
+    assert any("Humility 1" in r for r in decision.deny_reasons)
+
+
+def test_normalisation_does_not_manufacture_false_positives():
+    # Contains none of the patterns; normalisation must not invent one.
+    decision = evaluate([_user("What is the cosmological constant?")])
+    assert decision.allow
+    assert decision.deny_reasons == ()
